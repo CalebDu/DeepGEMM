@@ -38,6 +38,19 @@ struct Scheduler {
         if constexpr (kGemmType == GemmType::Normal) {
             num_blocks = num_aligned_m_blocks * kNumNBlocks;
         } else if (kGemmType == GemmType::GroupedContiguous) {
+            if((threadIdx.x & 31) == 0) {
+                int left = 0, right = num_aligned_m_blocks - 1;
+                while(left<=right) {
+                    int mid = left + (right-left)/2;
+                    if(__ldg(grouped_layout + mid * BLOCK_M)==-1) {
+                        num_aligned_m_blocks = mid;
+                        right = mid - 1;
+                    } else {
+                        left = mid + 1;
+                    }
+                }
+            }
+            num_aligned_m_blocks = __shfl_sync(0xffffffff,num_aligned_m_blocks, 0);
             num_blocks = num_aligned_m_blocks * kNumNBlocks;
             this->grouped_layout = grouped_layout;
         } else if (kGemmType == GemmType::GroupedMasked) {
